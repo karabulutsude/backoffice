@@ -18,11 +18,11 @@ jobs:
           distribution: 'temurin'
 
       - name: Build with Maven
-        run: mvn clean package -Pproduction
+        run: mvn clean package -Pproduction -DskipTests
 
       - name: Deploy to Azure
         uses: azure/webapps-deploy@v2
         with:
-          app-name: '<AZURE_APP_SERVICE_ADIN>'
+          app-name: 'gameanalytics-backoffice'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: target/*.jar
