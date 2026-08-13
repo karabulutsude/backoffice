@@ -1,7 +1,7 @@
 package com.jollifiy.backoffice.views;
 
 import com.jollifiy.backoffice.entity.Analytics;
-import com.jollifiy.backoffice.service.GameApiClient;
+import com.jollifiy.backoffice.service.BackofficeService;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -36,14 +36,14 @@ import java.util.stream.Collectors;
 @PermitAll
 public class DashboardView extends VerticalLayout {
 
-    private final GameApiClient gameApiClient;
+    private final BackofficeService backofficeService;
     private final Grid<Analytics> grid = new Grid<>(Analytics.class);
     private final TextField searchField = new TextField();
     private VerticalLayout eventCardsLayoutContainer;
 
     @Autowired
-    public DashboardView(GameApiClient gameApiClient) {
-        this.gameApiClient = gameApiClient;
+    public DashboardView(BackofficeService backofficeService) {
+        this.backofficeService = backofficeService;
 
         setSizeFull();
         setPadding(true);
@@ -76,9 +76,9 @@ public class DashboardView extends VerticalLayout {
         long analyticsCount = 0;
         long progressCount = 0;
         try {
-            playerCount = gameApiClient.getAllPlayers().size();
-            analyticsCount = gameApiClient.getAllAnalytics().size();
-            progressCount = gameApiClient.getAllProgress().size();
+            playerCount = backofficeService.getAllPlayers().size();
+            analyticsCount = backofficeService.getAllAnalytics().size();
+            progressCount = backofficeService.getAllProgress().size();
         } catch (Exception ignored) {}
 
         VerticalLayout playerCard = createStatCard("Toplam Oyuncu", String.valueOf(playerCount), VaadinIcon.USERS.create(), "#3b82f6");
@@ -149,7 +149,7 @@ public class DashboardView extends VerticalLayout {
 
     private String getMaxScoreDetails() {
         try {
-            List<Analytics> events = gameApiClient.getAllAnalytics();
+            List<Analytics> events = backofficeService.getAllAnalytics();
             if (events.isEmpty()) return "0";
 
             Analytics maxEvent = events.stream()
@@ -172,7 +172,7 @@ public class DashboardView extends VerticalLayout {
             csvContent.append("Player ID,Event Name,Level,Score,Created At\n");
 
             try {
-                List<Analytics> events = gameApiClient.getAllAnalytics();
+                List<Analytics> events = backofficeService.getAllAnalytics();
                 for (Analytics ev : events) {
                     csvContent.append(ev.getPlayerId()).append(",")
                             .append(ev.getEventName()).append(",")
@@ -204,7 +204,7 @@ public class DashboardView extends VerticalLayout {
 
     private void updateTableList() {
         try {
-            List<Analytics> allEvents = gameApiClient.getAllAnalytics();
+            List<Analytics> allEvents = backofficeService.getAllAnalytics();
             String filterText = searchField.getValue();
 
             if (filterText == null || filterText.isEmpty()) {
@@ -226,7 +226,7 @@ public class DashboardView extends VerticalLayout {
         layout.setWidthFull();
 
         try {
-            List<Analytics> events = gameApiClient.getAllAnalytics();
+            List<Analytics> events = backofficeService.getAllAnalytics();
             if (events.isEmpty()) {
                 layout.add(new Span("Gösterilecek olay verisi bulunamadı."));
                 eventCardsLayoutContainer.add(layout);
