@@ -26,6 +26,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -91,22 +93,7 @@ public class DashboardView extends VerticalLayout {
         cardsLayout.add(playerCard, analyticsCard, progressCard, topScoreCard);
         add(cardsLayout);
 
-        // 2. Hızlı Aksiyon Butonları
-        H3 actionTitle = new H3("Hızlı İşlemler");
-        actionTitle.getStyle().set("margin-top", "15px");
-
-        Button btnAnalytics = new Button("Analitiklere Git", VaadinIcon.CHART.create(), e -> UI.getCurrent().navigate(AnalyticsView.class));
-        btnAnalytics.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-        Button btnPlayers = new Button("Oyuncuları Görüntüle", VaadinIcon.USERS.create(), e -> UI.getCurrent().navigate(PlayerView.class));
-        Button btnConfig = new Button("Konfigürasyon Ekle", VaadinIcon.COG.create(), e -> UI.getCurrent().navigate(ConfigView.class));
-
-        HorizontalLayout actionsLayout = new HorizontalLayout(btnAnalytics, btnPlayers, btnConfig);
-        actionsLayout.setSpacing(true);
-
-        add(actionTitle, actionsLayout);
-
-        // 3. Olay Türleri İçin Modern Grid Kartları Alanı
+        // 2. Olay Türleri İçin Modern Grid Kartları Alanı
         H3 summaryTitle = new H3("Olay Türü Özet Kartları");
         summaryTitle.getStyle().set("margin-top", "15px");
 
@@ -117,7 +104,7 @@ public class DashboardView extends VerticalLayout {
 
         add(summaryTitle, eventCardsLayoutContainer);
 
-        // 4. Son Aktiviteler Tablosu ve Arama Alanı
+        // 3. Son Aktiviteler Tablosu ve Arama Alanı
         HorizontalLayout tableHeaderLayout = new HorizontalLayout();
         tableHeaderLayout.setWidthFull();
         tableHeaderLayout.setAlignItems(Alignment.CENTER);
@@ -139,7 +126,16 @@ public class DashboardView extends VerticalLayout {
         grid.getColumnByKey("eventName").setHeader("Olay Adı");
         grid.getColumnByKey("level").setHeader("Seviye");
         grid.getColumnByKey("score").setHeader("Skor");
-        grid.getColumnByKey("createdAt").setHeader("Zaman");
+
+        // Tarih formatını okunabilir hale getiriyoruz (GG.AA.YYYY SS:dd:ss)
+        grid.getColumnByKey("createdAt").setHeader("Zaman").setRenderer(new com.vaadin.flow.data.renderer.TextRenderer<>(analytics -> {
+            if (analytics.getCreatedAt() == null) return "-";
+            try {
+                return analytics.getCreatedAt().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss"));
+            } catch (Exception e) {
+                return analytics.getCreatedAt().toString();
+            }
+        }));
 
         grid.setHeight("220px");
         updateTableList();

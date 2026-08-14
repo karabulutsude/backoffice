@@ -22,6 +22,7 @@ public class Player {
     private String playerId;
 
     @Column(name = "device_id")
+
     private String deviceId;
 
     @Column(name = "country")

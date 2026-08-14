@@ -16,11 +16,12 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
+import jakarta.annotation.security.RolesAllowed; // Rol tabanlı yetki kontrolü için
 import org.springframework.beans.factory.annotation.Autowired;
 
 @PageTitle("Uygulama Konfigürasyonları | Jollify Game Analytics")
 @Route(value = "config", layout = MainLayout.class)
-@PermitAll
+@PermitAll // @RolesAllowed yerine @PermitAll kullanıyoruz
 public class ConfigView extends VerticalLayout {
 
     private final BackofficeService backofficeService;
