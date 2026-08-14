@@ -1,10 +1,8 @@
 import 'Frontend/generated/jar-resources/flow-component-renderer.js';
-import '@vaadin/polymer-legacy-adapter/style-modules.js';
-import '@vaadin/number-field/src/vaadin-number-field.js';
 import '@vaadin/side-nav/src/vaadin-side-nav.js';
+import '@vaadin/polymer-legacy-adapter/style-modules.js';
 import 'Frontend/generated/jar-resources/vaadin-grid-flow-selection-column.js';
 import '@vaadin/text-field/src/vaadin-text-field.js';
-import '@vaadin/integer-field/src/vaadin-integer-field.js';
 import '@vaadin/icons/vaadin-iconset.js';
 import '@vaadin/dialog/src/vaadin-dialog.js';
 import '@vaadin/vertical-layout/src/vaadin-vertical-layout.js';

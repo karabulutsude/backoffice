@@ -43,20 +43,24 @@ public class ConfigView extends VerticalLayout {
         HorizontalLayout toolbar = new HorizontalLayout(addButton, refreshButton);
         toolbar.setWidthFull();
 
-        grid.setColumns("id", "configKey", "configValue");
+        // Otomatik kolonları temizleyip özel formatlı kolonları ekliyoruz
+        grid.removeAllColumns();
 
-        if (grid.getColumnByKey("id") != null) grid.getColumnByKey("id").setHeader("ID");
-        if (grid.getColumnByKey("configKey") != null) grid.getColumnByKey("configKey").setHeader("Ayar Anahtarı (Key)");
-        if (grid.getColumnByKey("configValue") != null) grid.getColumnByKey("configValue").setHeader("Ayar Değeri (Value)");
+        grid.addColumn(AppConfig::getId).setHeader("ID").setSortable(true);
+        grid.addColumn(AppConfig::getConfigKey).setHeader("Ayar Anahtarı (Key)").setSortable(true);
+        grid.addColumn(AppConfig::getConfigValue).setHeader("Ayar Değeri (Value)").setSortable(true);
 
-        // Satıra çift tıklandığında düzenleme penceresini aç
-        grid.addItemDoubleClickListener(event -> openEditDialog(event.getItem()));
+        // İşlemler kolonuna Düzenle ve Sil butonları eklendi
+        grid.addComponentColumn(appConfig -> {
+            Button editButton = new Button(VaadinIcon.EDIT.create(), e -> openEditDialog(appConfig));
+            editButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_TERTIARY);
 
-        // Silme butonu kolonu
-        grid.addComponentColumn(config -> {
-            Button deleteButton = new Button(VaadinIcon.TRASH.create(), e -> deleteConfig(config));
+            Button deleteButton = new Button(VaadinIcon.TRASH.create(), e -> deleteConfig(appConfig));
             deleteButton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
-            return deleteButton;
+
+            HorizontalLayout actionsLayout = new HorizontalLayout(editButton, deleteButton);
+            actionsLayout.setSpacing(false);
+            return actionsLayout;
         }).setHeader("İşlemler");
 
         grid.setSizeFull();
@@ -77,16 +81,11 @@ public class ConfigView extends VerticalLayout {
 
         Button saveButton = new Button("Kaydet", e -> {
             try {
-                if (keyField.isEmpty() || valueField.isEmpty()) {
-                    Notification.show("Lütfen tüm alanları doldurun!", 3000, Notification.Position.TOP_CENTER);
-                    return;
-                }
+                AppConfig appConfig = new AppConfig();
+                appConfig.setConfigKey(keyField.getValue());
+                appConfig.setConfigValue(valueField.getValue());
 
-                AppConfig newConfig = new AppConfig();
-                newConfig.setConfigKey(keyField.getValue());
-                newConfig.setConfigValue(valueField.getValue());
-
-                backofficeService.saveConfig(newConfig);
+                backofficeService.saveConfig(appConfig);
 
                 Notification notif = Notification.show("Konfigürasyon başarıyla eklendi!", 3000, Notification.Position.TOP_CENTER);
                 notif.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
@@ -102,6 +101,7 @@ public class ConfigView extends VerticalLayout {
         Button cancelButton = new Button("İptal", e -> dialog.close());
 
         HorizontalLayout buttonsLayout = new HorizontalLayout(saveButton, cancelButton);
+
         VerticalLayout dialogLayout = new VerticalLayout(keyField, valueField, buttonsLayout);
         dialogLayout.setPadding(false);
         dialogLayout.setSpacing(true);
@@ -110,24 +110,24 @@ public class ConfigView extends VerticalLayout {
         dialog.open();
     }
 
-    private void openEditDialog(AppConfig config) {
+    private void openEditDialog(AppConfig appConfig) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Konfigürasyonu Düzenle");
 
         TextField keyField = new TextField("Ayar Anahtarı (Key)");
-        keyField.setValue(config.getConfigKey() != null ? config.getConfigKey() : "");
+        keyField.setValue(appConfig.getConfigKey() != null ? appConfig.getConfigKey() : "");
         keyField.setWidthFull();
 
         TextField valueField = new TextField("Ayar Değeri (Value)");
-        valueField.setValue(config.getConfigValue() != null ? config.getConfigValue() : "");
+        valueField.setValue(appConfig.getConfigValue() != null ? appConfig.getConfigValue() : "");
         valueField.setWidthFull();
 
         Button saveButton = new Button("Güncelle", e -> {
             try {
-                config.setConfigKey(keyField.getValue());
-                config.setConfigValue(valueField.getValue());
+                appConfig.setConfigKey(keyField.getValue());
+                appConfig.setConfigValue(valueField.getValue());
 
-                backofficeService.updateConfig(config.getId(), config);
+                backofficeService.updateConfig(appConfig.getId(), appConfig);
 
                 Notification notif = Notification.show("Konfigürasyon başarıyla güncellendi!", 3000, Notification.Position.TOP_CENTER);
                 notif.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
@@ -143,6 +143,7 @@ public class ConfigView extends VerticalLayout {
         Button cancelButton = new Button("İptal", e -> dialog.close());
 
         HorizontalLayout buttonsLayout = new HorizontalLayout(saveButton, cancelButton);
+
         VerticalLayout dialogLayout = new VerticalLayout(keyField, valueField, buttonsLayout);
         dialogLayout.setPadding(false);
         dialogLayout.setSpacing(true);
@@ -151,14 +152,14 @@ public class ConfigView extends VerticalLayout {
         dialog.open();
     }
 
-    private void deleteConfig(AppConfig config) {
+    private void deleteConfig(AppConfig appConfig) {
         Dialog confirmDialog = new Dialog();
         confirmDialog.setHeaderTitle("Konfigürasyonu Sil");
-        confirmDialog.add("Bu konfigürasyon kaydını silmek istediğinizden emin misiniz?");
+        confirmDialog.add("Bu konfigürasyonu silmek istediğinizden emin misiniz?");
 
         Button confirmButton = new Button("Sil", e -> {
             try {
-                backofficeService.deleteConfig(config.getId());
+                backofficeService.deleteConfig(appConfig.getId());
                 Notification notif = Notification.show("Konfigürasyon silindi.", 3000, Notification.Position.TOP_CENTER);
                 notif.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
                 confirmDialog.close();

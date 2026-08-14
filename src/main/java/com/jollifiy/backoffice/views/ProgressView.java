@@ -19,6 +19,8 @@ import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.format.DateTimeFormatter;
+
 @PageTitle("Oyuncu İlerleme Durumları | Jollify Game Analytics")
 @Route(value = "progress", layout = MainLayout.class)
 @PermitAll
@@ -40,22 +42,31 @@ public class ProgressView extends VerticalLayout {
         HorizontalLayout toolbar = new HorizontalLayout(refreshButton);
         toolbar.setWidthFull();
 
-        grid.setColumns("id", "playerId", "currentLevel", "totalCoins", "updatedAt");
+        // Otomatik kolonları temizleyip özel formatlı kolonları ekliyoruz
+        grid.removeAllColumns();
 
-        grid.getColumnByKey("id").setHeader("ID");
-        grid.getColumnByKey("playerId").setHeader("Oyuncu ID");
-        grid.getColumnByKey("currentLevel").setHeader("Mevcut Seviye");
-        grid.getColumnByKey("totalCoins").setHeader("Toplam Altın");
-        grid.getColumnByKey("updatedAt").setHeader("Güncellenme Zamanı");
+        grid.addColumn(Progress::getId).setHeader("ID").setSortable(true);
+        grid.addColumn(Progress::getPlayerId).setHeader("Oyuncu ID");
+        grid.addColumn(Progress::getCurrentLevel).setHeader("Mevcut Seviye").setSortable(true);
+        grid.addColumn(Progress::getTotalCoins).setHeader("Toplam Altın").setSortable(true);
 
-        // Satıra çift tıklandığında düzenleme penceresini aç
-        grid.addItemDoubleClickListener(event -> openEditDialog(event.getItem()));
+        // Güncellenme zamanı okunaklı formata çevriliyor
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
+        grid.addColumn(progress -> progress.getUpdatedAt() != null ? progress.getUpdatedAt().format(formatter) : "")
+                .setHeader("Güncellenme Zamanı")
+                .setSortable(true);
 
-        // Silme butonu kolonu
+        // Çift tıklama kaldırıldı, işlemler kolonuna Düzenle ve Sil butonları eklendi
         grid.addComponentColumn(progress -> {
+            Button editButton = new Button(VaadinIcon.EDIT.create(), e -> openEditDialog(progress));
+            editButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_TERTIARY);
+
             Button deleteButton = new Button(VaadinIcon.TRASH.create(), e -> deleteProgress(progress));
             deleteButton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
-            return deleteButton;
+
+            HorizontalLayout actionsLayout = new HorizontalLayout(editButton, deleteButton);
+            actionsLayout.setSpacing(false);
+            return actionsLayout;
         }).setHeader("İşlemler");
 
         grid.setSizeFull();
@@ -68,8 +79,9 @@ public class ProgressView extends VerticalLayout {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("İlerleme Durumunu Düzenle");
 
-        TextField playerIdField = new TextField("Oyuncu ID");
+        TextField playerIdField = new TextField("Oyuncu ID (Değiştirilemez)");
         playerIdField.setValue(progress.getPlayerId() != null ? progress.getPlayerId() : "");
+        playerIdField.setEnabled(false); // Oyuncu ID değiştirilemez yapıldı
         playerIdField.setWidthFull();
 
         IntegerField levelField = new IntegerField("Mevcut Seviye");
@@ -82,7 +94,7 @@ public class ProgressView extends VerticalLayout {
 
         Button saveButton = new Button("Güncelle", e -> {
             try {
-                progress.setPlayerId(playerIdField.getValue());
+                // Oyuncu ID sabit kalıyor, sadece seviye ve altın güncelleniyor
                 progress.setCurrentLevel(levelField.getValue());
                 progress.setTotalCoins(coinsField.getValue());
 

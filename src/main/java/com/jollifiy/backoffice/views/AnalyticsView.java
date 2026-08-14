@@ -12,13 +12,14 @@ import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.textfield.IntegerField;
-import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
 import org.springframework.beans.factory.annotation.Autowired;
+
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 @PageTitle("Oyun Analitikleri | Jollify Game Analytics")
 @Route(value = "analytics", layout = MainLayout.class)
@@ -41,25 +42,39 @@ public class AnalyticsView extends VerticalLayout {
         HorizontalLayout toolbar = new HorizontalLayout(refreshButton);
         toolbar.setWidthFull();
 
-        grid.setColumns("id", "playerId", "eventName", "level", "score", "coinCount", "playTime", "createdAt");
+        // Otomatik kolonları temizleyip özel formatlı kolonları ekliyoruz
+        grid.removeAllColumns();
 
-        grid.getColumnByKey("id").setHeader("ID");
-        grid.getColumnByKey("playerId").setHeader("Oyuncu ID");
-        grid.getColumnByKey("eventName").setHeader("Olay Adı");
-        grid.getColumnByKey("level").setHeader("Seviye");
-        grid.getColumnByKey("score").setHeader("Skor");
-        grid.getColumnByKey("coinCount").setHeader("Altın");
-        grid.getColumnByKey("playTime").setHeader("Oynama Süresi");
-        grid.getColumnByKey("createdAt").setHeader("Zaman");
+        grid.addColumn(Analytics::getId).setHeader("ID").setSortable(true);
+        grid.addColumn(Analytics::getPlayerId).setHeader("Oyuncu ID");
+        grid.addColumn(Analytics::getEventName).setHeader("Olay Adı");
+        grid.addColumn(Analytics::getLevel).setHeader("Seviye");
+        grid.addColumn(Analytics::getScore).setHeader("Skor");
+        grid.addColumn(Analytics::getCoinCount).setHeader("Altın");
 
-        // Satıra çift tıklandığında düzenleme penceresini aç
-        grid.addItemDoubleClickListener(event -> openEditDialog(event.getItem()));
+        // Oynama süresi virgülden sonra 2 basamak olacak şekilde formatlanıyor (Örn: 11.10)
+        grid.addColumn(analytics -> analytics.getPlayTime() != null
+                        ? String.format(Locale.US, "%.2f", analytics.getPlayTime()) : "0.00")
+                .setHeader("Oynama Süresi")
+                .setSortable(true);
 
-        // Silme butonu
+        // Zaman (createdAt) okunaklı formata çevriliyor
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
+        grid.addColumn(analytics -> analytics.getCreatedAt() != null ? analytics.getCreatedAt().format(formatter) : "")
+                .setHeader("Zaman")
+                .setSortable(true);
+
+        // Çift tıklama kaldırıldı, işlemler kolonuna Düzenle (detay görüntüleme/read-only) ve Sil butonları eklendi
         grid.addComponentColumn(analytics -> {
+            Button editButton = new Button(VaadinIcon.EDIT.create(), e -> openDetailsDialog(analytics));
+            editButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_TERTIARY);
+
             Button deleteButton = new Button(VaadinIcon.TRASH.create(), e -> deleteAnalytics(analytics));
             deleteButton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
-            return deleteButton;
+
+            HorizontalLayout actionsLayout = new HorizontalLayout(editButton, deleteButton);
+            actionsLayout.setSpacing(false);
+            return actionsLayout;
         }).setHeader("İşlemler");
 
         grid.setSizeFull();
@@ -68,59 +83,44 @@ public class AnalyticsView extends VerticalLayout {
         loadData();
     }
 
-    private void openEditDialog(Analytics analytics) {
+    private void openDetailsDialog(Analytics analytics) {
         Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Analitik Kaydını Düzenle");
+        dialog.setHeaderTitle("Analitik Kaydı Detayları (Salt Okunur)");
 
         TextField playerIdField = new TextField("Oyuncu ID");
         playerIdField.setValue(analytics.getPlayerId() != null ? analytics.getPlayerId() : "");
+        playerIdField.setEnabled(false);
         playerIdField.setWidthFull();
 
         TextField eventNameField = new TextField("Olay Adı (Event Name)");
         eventNameField.setValue(analytics.getEventName() != null ? analytics.getEventName() : "");
+        eventNameField.setEnabled(false);
         eventNameField.setWidthFull();
 
-        IntegerField levelField = new IntegerField("Seviye");
-        levelField.setValue(analytics.getLevel());
+        TextField levelField = new TextField("Seviye");
+        levelField.setValue(analytics.getLevel() != null ? analytics.getLevel().toString() : "");
+        levelField.setEnabled(false);
         levelField.setWidthFull();
 
-        IntegerField scoreField = new IntegerField("Skor");
-        scoreField.setValue(analytics.getScore());
+        TextField scoreField = new TextField("Skor");
+        scoreField.setValue(analytics.getScore() != null ? analytics.getScore().toString() : "");
+        scoreField.setEnabled(false);
         scoreField.setWidthFull();
 
-        IntegerField coinField = new IntegerField("Altın");
-        coinField.setValue(analytics.getCoinCount());
+        TextField coinField = new TextField("Altın");
+        coinField.setValue(analytics.getCoinCount() != null ? analytics.getCoinCount().toString() : "");
+        coinField.setEnabled(false);
         coinField.setWidthFull();
 
-        NumberField playTimeField = new NumberField("Oynama Süresi (sn)");
-        playTimeField.setValue(analytics.getPlayTime() != null ? analytics.getPlayTime() : 0.0);
+        TextField playTimeField = new TextField("Oynama Süresi (sn)");
+        playTimeField.setValue(analytics.getPlayTime() != null ? String.format(Locale.US, "%.2f", analytics.getPlayTime()) : "0.00");
+        playTimeField.setEnabled(false);
         playTimeField.setWidthFull();
 
-        Button saveButton = new Button("Güncelle", e -> {
-            try {
-                analytics.setPlayerId(playerIdField.getValue());
-                analytics.setEventName(eventNameField.getValue());
-                analytics.setLevel(levelField.getValue());
-                analytics.setScore(scoreField.getValue());
-                analytics.setCoinCount(coinField.getValue());
-                analytics.setPlayTime(playTimeField.getValue());
+        Button closeButton = new Button("Kapat", e -> dialog.close());
+        closeButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-                backofficeService.updateAnalytics(analytics.getId(), analytics);
-
-                Notification notif = Notification.show("Analitik başarıyla güncellendi!", 3000, Notification.Position.TOP_CENTER);
-                notif.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-
-                dialog.close();
-                loadData();
-            } catch (Exception ex) {
-                Notification.show("Güncelleme hatası: " + ex.getMessage(), 3000, Notification.Position.TOP_CENTER);
-            }
-        });
-        saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-        Button cancelButton = new Button("İptal", e -> dialog.close());
-
-        HorizontalLayout buttonsLayout = new HorizontalLayout(saveButton, cancelButton);
+        HorizontalLayout buttonsLayout = new HorizontalLayout(closeButton);
 
         VerticalLayout dialogLayout = new VerticalLayout(
                 playerIdField, eventNameField, levelField, scoreField, coinField, playTimeField, buttonsLayout

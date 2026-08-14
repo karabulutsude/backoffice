@@ -18,6 +18,8 @@ import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.format.DateTimeFormatter;
+
 @PageTitle("Oyuncular | Jollify Game Analytics")
 @Route(value = "players", layout = MainLayout.class)
 @PermitAll
@@ -38,22 +40,31 @@ public class PlayerView extends VerticalLayout {
         HorizontalLayout toolbar = new HorizontalLayout(refreshButton);
         toolbar.setWidthFull();
 
-        grid.setColumns("id", "playerId", "deviceId", "country", "createdAt");
+        // Otomatik kolonları temizleyip özel formatlı kolonları ekliyoruz
+        grid.removeAllColumns();
 
-        grid.getColumnByKey("id").setHeader("ID");
-        grid.getColumnByKey("playerId").setHeader("Oyuncu ID");
-        grid.getColumnByKey("deviceId").setHeader("Cihaz ID");
-        grid.getColumnByKey("country").setHeader("Ülke");
-        grid.getColumnByKey("createdAt").setHeader("Kayıt Tarihi");
+        grid.addColumn(Player::getId).setHeader("ID").setSortable(true);
+        grid.addColumn(Player::getPlayerId).setHeader("Oyuncu ID");
+        grid.addColumn(Player::getDeviceId).setHeader("Cihaz ID");
+        grid.addColumn(Player::getCountry).setHeader("Ülke");
 
-        // Satıra tıklandığında düzenleme penceresini aç
-        grid.addItemDoubleClickListener(event -> openEditDialog(event.getItem()));
+        // Kayıt tarihini okunaklı formata çeviriyoruz
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
+        grid.addColumn(player -> player.getCreatedAt() != null ? player.getCreatedAt().format(formatter) : "")
+                .setHeader("Kayıt Tarihi")
+                .setSortable(true);
 
-        // Silme butonu kolonunu ekle
+        // İşlemler kolonuna Düzenle ve Sil butonları eklendi
         grid.addComponentColumn(player -> {
+            Button editButton = new Button(VaadinIcon.EDIT.create(), e -> openEditDialog(player));
+            editButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_TERTIARY);
+
             Button deleteButton = new Button(VaadinIcon.TRASH.create(), e -> deletePlayer(player));
             deleteButton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
-            return deleteButton;
+
+            HorizontalLayout actionsLayout = new HorizontalLayout(editButton, deleteButton);
+            actionsLayout.setSpacing(false);
+            return actionsLayout;
         }).setHeader("İşlemler");
 
         grid.setSizeFull();
@@ -64,15 +75,16 @@ public class PlayerView extends VerticalLayout {
 
     private void openEditDialog(Player player) {
         Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Oyuncu Bilgilerini Düzenle");
+        dialog.setHeaderTitle("Oyuncu Ülke Bilgisini Düzenle");
 
-        TextField playerIdField = new TextField("Oyuncu ID");
+        TextField playerIdField = new TextField("Oyuncu ID (Değiştirilemez)");
         playerIdField.setValue(player.getPlayerId() != null ? player.getPlayerId() : "");
+        playerIdField.setEnabled(false);
         playerIdField.setWidthFull();
 
         TextField deviceIdField = new TextField("Cihaz ID (Değiştirilemez)");
         deviceIdField.setValue(player.getDeviceId() != null ? player.getDeviceId() : "");
-        deviceIdField.setEnabled(false); // Otomatik geldiği için değiştirilemez yapıldı
+        deviceIdField.setEnabled(false);
         deviceIdField.setWidthFull();
 
         TextField countryField = new TextField("Ülke");
@@ -81,12 +93,12 @@ public class PlayerView extends VerticalLayout {
 
         Button saveButton = new Button("Güncelle", e -> {
             try {
-                player.setPlayerId(playerIdField.getValue());
+                // Sadece ülke bilgisi güncelleniyor
                 player.setCountry(countryField.getValue());
 
                 backofficeService.updatePlayer(player.getId(), player);
 
-                Notification notif = Notification.show("Oyuncu başarıyla güncellendi!", 3000, Notification.Position.TOP_CENTER);
+                Notification notif = Notification.show("Oyuncu ülkesi başarıyla güncellendi!", 3000, Notification.Position.TOP_CENTER);
                 notif.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
 
                 dialog.close();
