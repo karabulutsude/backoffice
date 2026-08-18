@@ -4,6 +4,7 @@ import com.jollifiy.backoffice.entity.User;
 import com.jollifiy.backoffice.service.UserService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.checkbox.CheckboxGroup;
 import com.vaadin.flow.component.checkbox.CheckboxGroupVariant;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -28,7 +29,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -62,6 +62,15 @@ public class UserView extends VerticalLayout {
         grid.addColumn(User::getUsername).setHeader("Kullanıcı Adı").setSortable(true);
         grid.addColumn(User::getRole).setHeader("Rol").setSortable(true);
 
+        // Aktif / Pasif Durum Kolonu (Görsel Badge ile)
+        grid.addComponentColumn(user -> {
+            boolean isActive = user.getIsActive() != null ? user.getIsActive() : true;
+            Span badge = new Span(isActive ? "Aktif" : "Pasif");
+            badge.getElement().getThemeList().add(isActive ? "badge success" : "badge error");
+            return badge;
+        }).setHeader("Durum").setSortable(true);
+
+        // Özel Yetkiler Kolonu
         grid.addComponentColumn(user -> {
             VerticalLayout permsLayout = new VerticalLayout();
             permsLayout.setPadding(false);
@@ -72,7 +81,7 @@ public class UserView extends VerticalLayout {
                 String[] perms = user.getPermissions().split(",");
                 for (String perm : perms) {
                     String trimmed = perm.trim();
-                    String displayPerm = translatePermission(trimmed); // İngilizce/Türkçe otomatik çevirici
+                    String displayPerm = translatePermission(trimmed);
 
                     Span permSpan = new Span(displayPerm);
                     permSpan.getStyle().set("font-size", "var(--lumo-font-size-s)");
@@ -84,6 +93,7 @@ public class UserView extends VerticalLayout {
             return permsLayout;
         }).setHeader("Özel Yetkiler");
 
+        // İşlemler Kolonu
         grid.addComponentColumn(user -> {
             Button editButton = new Button(VaadinIcon.EDIT.create(), e -> openEditDialog(user));
             editButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_TERTIARY);
@@ -102,7 +112,6 @@ public class UserView extends VerticalLayout {
         loadData();
     }
 
-    // İngilizce veya Türkçe anahtarları ortak bir dilde (Türkçe) gösteren yardımcı metot
     private String translatePermission(String perm) {
         switch (perm.toUpperCase()) {
             case "CONFIG":
@@ -131,6 +140,7 @@ public class UserView extends VerticalLayout {
     private void openAddDialog() {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Yeni Kullanıcı Ekle");
+        dialog.setWidth("450px");
 
         TextField usernameField = new TextField("Kullanıcı Adı");
         usernameField.setWidthFull();
@@ -141,6 +151,9 @@ public class UserView extends VerticalLayout {
         TextField roleField = new TextField("Rol (Örn: ADMIN veya STAFF)");
         roleField.setValue("STAFF");
         roleField.setWidthFull();
+
+        Checkbox activeCheckbox = new Checkbox("Aktif Et (Kullanıcı Sisteme Giriş Yapabilsin)");
+        activeCheckbox.setValue(true);
 
         CheckboxGroup<String> permissionCheckboxes = new CheckboxGroup<>();
         permissionCheckboxes.setLabel("Erişebileceği Sayfalar");
@@ -153,6 +166,7 @@ public class UserView extends VerticalLayout {
                 user.setUsername(usernameField.getValue());
                 user.setPassword(passwordField.getValue());
                 user.setRole(roleField.getValue());
+                user.setIsActive(activeCheckbox.getValue());
 
                 Set<String> selectedPerms = permissionCheckboxes.getValue();
                 user.setPermissions(String.join(",", selectedPerms));
@@ -173,7 +187,7 @@ public class UserView extends VerticalLayout {
         Button cancelButton = new Button("İptal", e -> dialog.close());
         HorizontalLayout buttonsLayout = new HorizontalLayout(saveButton, cancelButton);
 
-        VerticalLayout dialogLayout = new VerticalLayout(usernameField, passwordField, roleField, permissionCheckboxes, buttonsLayout);
+        VerticalLayout dialogLayout = new VerticalLayout(usernameField, passwordField, roleField, activeCheckbox, permissionCheckboxes, buttonsLayout);
         dialogLayout.setPadding(false);
         dialogLayout.setSpacing(true);
 
@@ -184,17 +198,21 @@ public class UserView extends VerticalLayout {
     private void openEditDialog(User user) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Kullanıcıyı Düzenle: " + user.getUsername());
+        dialog.setWidth("450px");
 
         TextField usernameField = new TextField("Kullanıcı Adı");
         usernameField.setValue(user.getUsername() != null ? user.getUsername() : "");
         usernameField.setWidthFull();
 
-        PasswordField passwordField = new PasswordField("Yeni Şifre (Değiştirmek istemiyorsanız boş bırakın)");
+        PasswordField passwordField = new PasswordField("Yeni Şifre (Boş bırakırsanız değişmez)");
         passwordField.setWidthFull();
 
         TextField roleField = new TextField("Rol");
         roleField.setValue(user.getRole() != null ? user.getRole() : "");
         roleField.setWidthFull();
+
+        Checkbox activeCheckbox = new Checkbox("Aktif Et (Kullanıcı Sisteme Giriş Yapabilsin)");
+        activeCheckbox.setValue(user.getIsActive() != null ? user.getIsActive() : true);
 
         CheckboxGroup<String> permissionCheckboxes = new CheckboxGroup<>();
         permissionCheckboxes.setLabel("Erişebileceği Modüller / Sayfalar");
@@ -223,6 +241,7 @@ public class UserView extends VerticalLayout {
                 }
 
                 user.setRole(roleField.getValue());
+                user.setIsActive(activeCheckbox.getValue());
 
                 Set<String> selectedPerms = permissionCheckboxes.getValue();
                 user.setPermissions(String.join(",", selectedPerms));
@@ -263,7 +282,7 @@ public class UserView extends VerticalLayout {
         Button cancelButton = new Button("İptal", e -> dialog.close());
         HorizontalLayout buttonsLayout = new HorizontalLayout(saveButton, cancelButton);
 
-        VerticalLayout dialogLayout = new VerticalLayout(usernameField, passwordField, roleField, permissionCheckboxes, buttonsLayout);
+        VerticalLayout dialogLayout = new VerticalLayout(usernameField, passwordField, roleField, activeCheckbox, permissionCheckboxes, buttonsLayout);
         dialogLayout.setPadding(false);
         dialogLayout.setSpacing(true);
 

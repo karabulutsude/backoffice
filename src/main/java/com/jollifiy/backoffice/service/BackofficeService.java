@@ -53,6 +53,7 @@ public class BackofficeService {
                 .orElseThrow(() -> new RuntimeException("Oyuncu bulunamadı: " + id));
         player.setPlayerId(playerDetails.getPlayerId());
         player.setCountry(playerDetails.getCountry());
+        player.setBanned(playerDetails.isBanned());
         return playerRepository.save(player);
     }
     public void deletePlayer(Long id) { playerRepository.deleteById(id); }
@@ -72,13 +73,17 @@ public class BackofficeService {
     // Config İşlemleri
     public List<AppConfig> getAllConfigs() { return appConfigRepository.findAll(); }
     public void saveConfig(AppConfig config) { appConfigRepository.save(config); }
+
     public AppConfig updateConfig(Long id, AppConfig configDetails) {
         AppConfig config = appConfigRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Konfigürasyon bulunamadı: " + id));
-        // Metot isimlerini güncellenmiş halleriyle değiştirdik:
+
         config.setConfigKey(configDetails.getConfigKey());
         config.setConfigValue(configDetails.getConfigValue());
+        config.setIsActive(configDetails.getIsActive()); // <-- AKTİF/PASİF DURUMUNUN GÜNCELLENMESİ İÇİN BU EKLENDİ
+
         return appConfigRepository.save(config);
     }
+
     public void deleteConfig(Long id) { appConfigRepository.deleteById(id); }
 }

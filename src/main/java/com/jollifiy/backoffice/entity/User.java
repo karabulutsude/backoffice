@@ -21,6 +21,9 @@ public class User {
     @Column(length = 1000)
     private String permissions; // Örn: "CONFIG,USERS,ANALYTICS,DASHBOARD" (Seçilen yetkiler)
 
+    @Column(nullable = false)
+    private Boolean isActive = true; // Kullanıcının aktif/pasif durumu
+
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -36,4 +39,7 @@ public class User {
 
     public String getPermissions() { return permissions; }
     public void setPermissions(String permissions) { this.permissions = permissions; }
+
+    public Boolean getIsActive() { return isActive; }
+    public void setIsActive(Boolean isActive) { this.isActive = isActive; }
 }

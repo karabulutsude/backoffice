@@ -4,28 +4,36 @@ import com.jollifiy.backoffice.entity.AppConfig;
 import com.jollifiy.backoffice.service.BackofficeService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H2;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
-import jakarta.annotation.security.RolesAllowed; // Rol tabanlı yetki kontrolü için
 import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @PageTitle("Uygulama Konfigürasyonları | Jollify Game Analytics")
 @Route(value = "config", layout = MainLayout.class)
-@PermitAll // @RolesAllowed yerine @PermitAll kullanıyoruz
+@PermitAll
 public class ConfigView extends VerticalLayout {
 
     private final BackofficeService backofficeService;
     private final Grid<AppConfig> grid = new Grid<>(AppConfig.class);
+
+    private final Select<String> configFilterSelect = new Select<>();
 
     @Autowired
     public ConfigView(BackofficeService backofficeService) {
@@ -36,30 +44,52 @@ public class ConfigView extends VerticalLayout {
 
         add(new H2("Uygulama Konfigürasyonları"));
 
+        // Ayar Anahtarı Filtresi ("Tümü" seçeneği ile birlikte)
+        configFilterSelect.setLabel("Ayar Anahtarı Filtresi");
+        configFilterSelect.setWidth("250px");
+        configFilterSelect.addValueChangeListener(e -> applyFilter());
+
         Button addButton = new Button("Yeni Konfigürasyon Ekle", VaadinIcon.PLUS.create(), e -> openAddDialog());
         addButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-        Button refreshButton = new Button("Yenile", VaadinIcon.REFRESH.create(), e -> loadData());
+        Button refreshButton = new Button("Yenile", VaadinIcon.REFRESH.create(), e -> {
+            configFilterSelect.setValue("Tümü");
+            loadData();
+        });
 
-        HorizontalLayout toolbar = new HorizontalLayout(addButton, refreshButton);
+        HorizontalLayout toolbar = new HorizontalLayout(configFilterSelect, addButton, refreshButton);
+        toolbar.setAlignItems(FlexComponent.Alignment.BASELINE);
         toolbar.setWidthFull();
 
-        // Otomatik kolonları temizleyip özel formatlı kolonları ekliyoruz
         grid.removeAllColumns();
 
         grid.addColumn(AppConfig::getId).setHeader("ID").setSortable(true);
         grid.addColumn(AppConfig::getConfigKey).setHeader("Ayar Anahtarı (Key)").setSortable(true);
         grid.addColumn(AppConfig::getConfigValue).setHeader("Ayar Değeri (Value)").setSortable(true);
 
-        // İşlemler kolonuna Düzenle ve Sil butonları eklendi
+        // Aktif / Pasif Durum Kolonu (Görsel Badge veya Checkbox ile)
         grid.addComponentColumn(appConfig -> {
+            boolean isActive = appConfig.getIsActive() != null ? appConfig.getIsActive() : true;
+            Span badge = new Span(isActive ? "Aktif" : "Pasif");
+            badge.getElement().getThemeList().add(isActive ? "badge success" : "badge error");
+            return badge;
+        }).setHeader("Durum").setSortable(true);
+
+        // İşlemler Kolonu
+        grid.addComponentColumn(appConfig -> {
+            Button detailButton = new Button(VaadinIcon.EYE.create(), e -> openDetailDialog(appConfig));
+            detailButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+            detailButton.setTooltipText("Konfigürasyon Detayları");
+
             Button editButton = new Button(VaadinIcon.EDIT.create(), e -> openEditDialog(appConfig));
             editButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_TERTIARY);
+            editButton.setTooltipText("Düzenle");
 
             Button deleteButton = new Button(VaadinIcon.TRASH.create(), e -> deleteConfig(appConfig));
             deleteButton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
+            deleteButton.setTooltipText("Sil");
 
-            HorizontalLayout actionsLayout = new HorizontalLayout(editButton, deleteButton);
+            HorizontalLayout actionsLayout = new HorizontalLayout(detailButton, editButton, deleteButton);
             actionsLayout.setSpacing(false);
             return actionsLayout;
         }).setHeader("İşlemler");
@@ -68,6 +98,45 @@ public class ConfigView extends VerticalLayout {
 
         add(toolbar, grid);
         loadData();
+    }
+
+    private void openDetailDialog(AppConfig appConfig) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Konfigürasyon Detay Kartı");
+        dialog.setWidth("500px");
+
+        boolean isActive = appConfig.getIsActive() != null ? appConfig.getIsActive() : true;
+
+        VerticalLayout content = new VerticalLayout(
+                createDetailRow("ID:", String.valueOf(appConfig.getId())),
+                createDetailRow("Ayar Anahtarı:", appConfig.getConfigKey() != null ? appConfig.getConfigKey() : "-"),
+                createDetailRow("Ayar Değeri:", appConfig.getConfigValue() != null ? appConfig.getConfigValue() : "-"),
+                createDetailRow("Durum:", isActive ? "Aktif" : "Pasif")
+        );
+        content.setSpacing(true);
+        content.setPadding(false);
+
+        Button closeButton = new Button("Kapat", e -> dialog.close());
+        closeButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+        dialog.add(content);
+        dialog.getFooter().add(closeButton);
+        dialog.open();
+    }
+
+    private HorizontalLayout createDetailRow(String label, String value) {
+        Span labelSpan = new Span(label);
+        labelSpan.getStyle().set("font-weight", "bold");
+        labelSpan.setWidth("130px");
+
+        Span valueSpan = new Span(value);
+        valueSpan.getStyle().set("word-break", "break-all");
+        valueSpan.getStyle().set("flex-grow", "1");
+
+        HorizontalLayout row = new HorizontalLayout(labelSpan, valueSpan);
+        row.setWidthFull();
+        row.setAlignItems(FlexComponent.Alignment.CENTER);
+        return row;
     }
 
     private void openAddDialog() {
@@ -80,11 +149,15 @@ public class ConfigView extends VerticalLayout {
         TextField valueField = new TextField("Ayar Değeri (Value)");
         valueField.setWidthFull();
 
+        Checkbox activeCheckbox = new Checkbox("Aktif Et (Konfigürasyon Kullanımda Olsun)");
+        activeCheckbox.setValue(true);
+
         Button saveButton = new Button("Kaydet", e -> {
             try {
                 AppConfig appConfig = new AppConfig();
                 appConfig.setConfigKey(keyField.getValue());
                 appConfig.setConfigValue(valueField.getValue());
+                appConfig.setIsActive(activeCheckbox.getValue());
 
                 backofficeService.saveConfig(appConfig);
 
@@ -100,10 +173,9 @@ public class ConfigView extends VerticalLayout {
         saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
         Button cancelButton = new Button("İptal", e -> dialog.close());
-
         HorizontalLayout buttonsLayout = new HorizontalLayout(saveButton, cancelButton);
 
-        VerticalLayout dialogLayout = new VerticalLayout(keyField, valueField, buttonsLayout);
+        VerticalLayout dialogLayout = new VerticalLayout(keyField, valueField, activeCheckbox, buttonsLayout);
         dialogLayout.setPadding(false);
         dialogLayout.setSpacing(true);
 
@@ -123,10 +195,14 @@ public class ConfigView extends VerticalLayout {
         valueField.setValue(appConfig.getConfigValue() != null ? appConfig.getConfigValue() : "");
         valueField.setWidthFull();
 
+        Checkbox activeCheckbox = new Checkbox("Aktif Et (Konfigürasyon Kullanımda Olsun)");
+        activeCheckbox.setValue(appConfig.getIsActive() != null ? appConfig.getIsActive() : true);
+
         Button saveButton = new Button("Güncelle", e -> {
             try {
                 appConfig.setConfigKey(keyField.getValue());
                 appConfig.setConfigValue(valueField.getValue());
+                appConfig.setIsActive(activeCheckbox.getValue());
 
                 backofficeService.updateConfig(appConfig.getId(), appConfig);
 
@@ -142,10 +218,9 @@ public class ConfigView extends VerticalLayout {
         saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
         Button cancelButton = new Button("İptal", e -> dialog.close());
-
         HorizontalLayout buttonsLayout = new HorizontalLayout(saveButton, cancelButton);
 
-        VerticalLayout dialogLayout = new VerticalLayout(keyField, valueField, buttonsLayout);
+        VerticalLayout dialogLayout = new VerticalLayout(keyField, valueField, activeCheckbox, buttonsLayout);
         dialogLayout.setPadding(false);
         dialogLayout.setSpacing(true);
 
@@ -179,9 +254,41 @@ public class ConfigView extends VerticalLayout {
 
     private void loadData() {
         try {
-            grid.setItems(backofficeService.getAllConfigs());
+            List<AppConfig> allConfigs = backofficeService.getAllConfigs();
+            grid.setItems(allConfigs);
+
+            List<String> keys = new ArrayList<>();
+            keys.add("Tümü");
+
+            allConfigs.stream()
+                    .map(AppConfig::getConfigKey)
+                    .filter(key -> key != null && !key.isEmpty())
+                    .distinct()
+                    .forEach(keys::add);
+
+            configFilterSelect.setItems(keys);
+            if (configFilterSelect.getValue() == null) {
+                configFilterSelect.setValue("Tümü");
+            }
         } catch (Exception e) {
             Notification.show("Konfigürasyon verileri yüklenirken hata: " + e.getMessage());
+        }
+    }
+
+    private void applyFilter() {
+        String selectedKey = configFilterSelect.getValue();
+        try {
+            List<AppConfig> allConfigs = backofficeService.getAllConfigs();
+            if (selectedKey == null || "Tümü".equals(selectedKey)) {
+                grid.setItems(allConfigs);
+            } else {
+                List<AppConfig> filtered = allConfigs.stream()
+                        .filter(c -> selectedKey.equals(c.getConfigKey()))
+                        .toList();
+                grid.setItems(filtered);
+            }
+        } catch (Exception e) {
+            Notification.show("Filtreleme hatası: " + e.getMessage());
         }
     }
 }

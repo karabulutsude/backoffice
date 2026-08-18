@@ -16,6 +16,9 @@ public class AppConfig {
     @Column(nullable = false)
     private String configValue;
 
+    @Column(nullable = false)
+    private Boolean isActive = true; // Varsayılan olarak aktif gelsin
+
     public Long getId() {
         return id;
     }
@@ -38,5 +41,13 @@ public class AppConfig {
 
     public void setConfigValue(String configValue) {
         this.configValue = configValue;
+    }
+
+    public Boolean getIsActive() {
+        return isActive;
+    }
+
+    public void setIsActive(Boolean isActive) {
+        this.isActive = isActive;
     }
 }

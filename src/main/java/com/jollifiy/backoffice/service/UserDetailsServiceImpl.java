@@ -65,9 +65,16 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             }
         }
 
+        // Kullanıcının aktiflik durumu (Eğer null ise varsayılan olarak true kabul edilir)
+        boolean enabled = user.getIsActive() != null ? user.getIsActive() : true;
+
         return new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
                 user.getPassword(),
+                enabled, // enabled (true: aktif, false: pasif / giriş yapamaz)
+                true,    // accountNonExpired
+                true,    // credentialsNonExpired
+                true,    // accountNonLocked
                 authorities
         );
     }

@@ -7,18 +7,24 @@ import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H2;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
 
 @PageTitle("Oyun Analitikleri | Jollify Game Analytics")
@@ -29,6 +35,10 @@ public class AnalyticsView extends VerticalLayout {
     private final BackofficeService backofficeService;
     private final Grid<Analytics> grid = new Grid<>(Analytics.class);
 
+    // Filtreleme bileşenleri (Sadece seçilebilir Select yapısı)
+    private final Select<String> eventFilter = new Select<>();
+    private final Select<String> timeFilter = new Select<>();
+
     @Autowired
     public AnalyticsView(BackofficeService backofficeService) {
         this.backofficeService = backofficeService;
@@ -38,8 +48,26 @@ public class AnalyticsView extends VerticalLayout {
 
         add(new H2("Oyun Analitikleri ve Olaylar"));
 
-        Button refreshButton = new Button("Yenile", VaadinIcon.REFRESH.create(), e -> loadData());
-        HorizontalLayout toolbar = new HorizontalLayout(refreshButton);
+        // Olay Adı Filtresi Ayarları
+        eventFilter.setLabel("Olay Adı Filtresi");
+        eventFilter.setItems("Tümü", "GameScenes_WIN", "GameScenes_LOSE", "Level2_WIN", "Level2_LOSE", "Level3_WIN", "Level3_LOSE");
+        eventFilter.setValue("Tümü");
+        eventFilter.addValueChangeListener(e -> applyFilters());
+
+        // Zaman Filtresi Ayarları
+        timeFilter.setLabel("Zaman Aralığı");
+        timeFilter.setItems("Tüm Zamanlar", "Bugün", "Son 7 Gün", "Bu Ay");
+        timeFilter.setValue("Tüm Zamanlar");
+        timeFilter.addValueChangeListener(e -> applyFilters());
+
+        Button refreshButton = new Button("Yenile", VaadinIcon.REFRESH.create(), e -> {
+            eventFilter.setValue("Tümü");
+            timeFilter.setValue("Tüm Zamanlar");
+            applyFilters();
+        });
+
+        HorizontalLayout toolbar = new HorizontalLayout(eventFilter, timeFilter, refreshButton);
+        toolbar.setAlignItems(FlexComponent.Alignment.END);
         toolbar.setWidthFull();
 
         // Otomatik kolonları temizleyip özel formatlı kolonları ekliyoruz
@@ -64,15 +92,16 @@ public class AnalyticsView extends VerticalLayout {
                 .setHeader("Zaman")
                 .setSortable(true);
 
-        // Çift tıklama kaldırıldı, işlemler kolonuna Düzenle (detay görüntüleme/read-only) ve Sil butonları eklendi
         grid.addComponentColumn(analytics -> {
-            Button editButton = new Button(VaadinIcon.EDIT.create(), e -> openDetailsDialog(analytics));
-            editButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_TERTIARY);
+            Button detailButton = new Button(VaadinIcon.EYE.create(), e -> openDetailsDialog(analytics));
+            detailButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+            detailButton.setTooltipText("Detayları Görüntüle");
 
             Button deleteButton = new Button(VaadinIcon.TRASH.create(), e -> deleteAnalytics(analytics));
             deleteButton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
+            deleteButton.setTooltipText("Kayıt Sil");
 
-            HorizontalLayout actionsLayout = new HorizontalLayout(editButton, deleteButton);
+            HorizontalLayout actionsLayout = new HorizontalLayout(detailButton, deleteButton);
             actionsLayout.setSpacing(false);
             return actionsLayout;
         }).setHeader("İşlemler");
@@ -80,56 +109,51 @@ public class AnalyticsView extends VerticalLayout {
         grid.setSizeFull();
 
         add(toolbar, grid);
-        loadData();
+        applyFilters();
     }
 
     private void openDetailsDialog(Analytics analytics) {
         Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Analitik Kaydı Detayları (Salt Okunur)");
+        dialog.setHeaderTitle("Analitik Kaydı Detay Kartı");
+        dialog.setWidth("650px");
 
-        TextField playerIdField = new TextField("Oyuncu ID");
-        playerIdField.setValue(analytics.getPlayerId() != null ? analytics.getPlayerId() : "");
-        playerIdField.setEnabled(false);
-        playerIdField.setWidthFull();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
+        String formattedDate = analytics.getCreatedAt() != null ? analytics.getCreatedAt().format(formatter) : "Bilinmiyor";
 
-        TextField eventNameField = new TextField("Olay Adı (Event Name)");
-        eventNameField.setValue(analytics.getEventName() != null ? analytics.getEventName() : "");
-        eventNameField.setEnabled(false);
-        eventNameField.setWidthFull();
-
-        TextField levelField = new TextField("Seviye");
-        levelField.setValue(analytics.getLevel() != null ? analytics.getLevel().toString() : "");
-        levelField.setEnabled(false);
-        levelField.setWidthFull();
-
-        TextField scoreField = new TextField("Skor");
-        scoreField.setValue(analytics.getScore() != null ? analytics.getScore().toString() : "");
-        scoreField.setEnabled(false);
-        scoreField.setWidthFull();
-
-        TextField coinField = new TextField("Altın");
-        coinField.setValue(analytics.getCoinCount() != null ? analytics.getCoinCount().toString() : "");
-        coinField.setEnabled(false);
-        coinField.setWidthFull();
-
-        TextField playTimeField = new TextField("Oynama Süresi (sn)");
-        playTimeField.setValue(analytics.getPlayTime() != null ? String.format(Locale.US, "%.2f", analytics.getPlayTime()) : "0.00");
-        playTimeField.setEnabled(false);
-        playTimeField.setWidthFull();
+        VerticalLayout content = new VerticalLayout(
+                createDetailRow("Veritabanı ID:", String.valueOf(analytics.getId())),
+                createDetailRow("Oyuncu UUID:", analytics.getPlayerId() != null ? analytics.getPlayerId() : "-"),
+                createDetailRow("Olay Adı (Event):", analytics.getEventName() != null ? analytics.getEventName() : "-"),
+                createDetailRow("Seviye:", analytics.getLevel() != null ? analytics.getLevel().toString() : "-"),
+                createDetailRow("Skor:", analytics.getScore() != null ? analytics.getScore().toString() : "-"),
+                createDetailRow("Altın Sayısı:", analytics.getCoinCount() != null ? analytics.getCoinCount().toString() : "-"),
+                createDetailRow("Oynama Süresi:", analytics.getPlayTime() != null ? String.format(Locale.US, "%.2f sn", analytics.getPlayTime()) : "0.00 sn"),
+                createDetailRow("Zaman Damgası:", formattedDate)
+        );
+        content.setSpacing(true);
+        content.setPadding(false);
 
         Button closeButton = new Button("Kapat", e -> dialog.close());
         closeButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-        HorizontalLayout buttonsLayout = new HorizontalLayout(closeButton);
-
-        VerticalLayout dialogLayout = new VerticalLayout(
-                playerIdField, eventNameField, levelField, scoreField, coinField, playTimeField, buttonsLayout
-        );
-        dialogLayout.setPadding(false);
-        dialogLayout.setSpacing(true);
-
-        dialog.add(dialogLayout);
+        dialog.add(content);
+        dialog.getFooter().add(closeButton);
         dialog.open();
+    }
+
+    private HorizontalLayout createDetailRow(String label, String value) {
+        Span labelSpan = new Span(label);
+        labelSpan.getStyle().set("font-weight", "bold");
+        labelSpan.setWidth("140px");
+
+        Span valueSpan = new Span(value);
+        valueSpan.getStyle().set("word-break", "break-all");
+        valueSpan.getStyle().set("flex-grow", "1");
+
+        HorizontalLayout row = new HorizontalLayout(labelSpan, valueSpan);
+        row.setWidthFull();
+        row.setAlignItems(FlexComponent.Alignment.CENTER);
+        return row;
     }
 
     private void deleteAnalytics(Analytics analytics) {
@@ -143,7 +167,7 @@ public class AnalyticsView extends VerticalLayout {
                 Notification notif = Notification.show("Analitik kaydı silindi.", 3000, Notification.Position.TOP_CENTER);
                 notif.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
                 confirmDialog.close();
-                loadData();
+                applyFilters();
             } catch (Exception ex) {
                 Notification.show("Silme hatası: " + ex.getMessage());
             }
@@ -156,11 +180,44 @@ public class AnalyticsView extends VerticalLayout {
         confirmDialog.open();
     }
 
-    private void loadData() {
+    private void applyFilters() {
+        String selectedEvent = eventFilter.getValue();
+        String selectedTime = timeFilter.getValue();
+
         try {
-            grid.setItems(backofficeService.getAllAnalytics());
+            List<Analytics> allAnalytics = backofficeService.getAllAnalytics();
+            LocalDateTime now = LocalDateTime.now();
+
+            List<Analytics> filteredList = allAnalytics.stream().filter(a -> {
+                // Olay Adı Filtresi
+                boolean matchesEvent = ("Tümü".equals(selectedEvent) || selectedEvent == null ||
+                        (a.getEventName() != null && a.getEventName().equals(selectedEvent)));
+
+                // Zaman Filtresi
+                boolean matchesTime = true;
+                if (a.getCreatedAt() != null && selectedTime != null) {
+                    switch (selectedTime) {
+                        case "Bugün":
+                            matchesTime = a.getCreatedAt().toLocalDate().isEqual(LocalDate.now());
+                            break;
+                        case "Son 7 Gün":
+                            matchesTime = a.getCreatedAt().isAfter(now.minusDays(7));
+                            break;
+                        case "Bu Ay":
+                            matchesTime = a.getCreatedAt().getYear() == now.getYear() &&
+                                    a.getCreatedAt().getMonth() == now.getMonth();
+                            break;
+                        default:
+                            matchesTime = true; // "Tüm Zamanlar"
+                    }
+                }
+
+                return matchesEvent && matchesTime;
+            }).toList();
+
+            grid.setItems(filteredList);
         } catch (Exception e) {
-            Notification.show("Analitik verileri yüklenirken hata: " + e.getMessage());
+            Notification.show("Filtreleme hatası: " + e.getMessage());
         }
     }
 }
