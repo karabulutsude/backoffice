@@ -38,6 +38,15 @@ import '@vaadin/vaadin-lumo-styles/vaadin-iconset.js';
 
 const loadOnDemand = (key) => {
   const pending = [];
+  if (key === '68e43c58134910d9aa549e7d0554084e964306ad13097ed153b8d24c585c308d') {
+    pending.push(import('./chunks/chunk-b93d3cb504528ee95dccabc0f05b864160356ff045b00673fe7d1b606703dd12.js'));
+  }
+  if (key === '32f6101d32f91e18cc91ee5a6be97128e26ffdc9c177aa1b151004891e5ca576') {
+    pending.push(import('./chunks/chunk-72b1e040fa670d1923f20c07f3566be193ebd984ee7ad9ed3645f87f6bbdf94a.js'));
+  }
+  if (key === 'b8fb286eecb732153f493a56a753b310572ce368e6f9b92e3a152254936438d6') {
+    pending.push(import('./chunks/chunk-73a2958692cf7dfa39607f5ed1481b74bfd8b4e7a9112345b701f8a1755f547c.js'));
+  }
   if (key === '62443ab6f3feb634a471089d175fad755d119a0496cb1ca30754fc1ec1c8c192') {
     pending.push(import('./chunks/chunk-43d38d604beb08f99ad85b9b12ce15bf8dc6b5faef674e5f477f07675b1a772d.js'));
   }
@@ -45,13 +54,7 @@ const loadOnDemand = (key) => {
     pending.push(import('./chunks/chunk-73a2958692cf7dfa39607f5ed1481b74bfd8b4e7a9112345b701f8a1755f547c.js'));
   }
   if (key === 'd707760d5c4cb866f730a78ebbe6dcea2e48506900a0d7393bde6d86889faff8') {
-    pending.push(import('./chunks/chunk-531ffd8f01385d18258ac8390a1a0d906ad8b3f8f563295d2d4797db00a92390.js'));
-  }
-  if (key === '32f6101d32f91e18cc91ee5a6be97128e26ffdc9c177aa1b151004891e5ca576') {
-    pending.push(import('./chunks/chunk-72b1e040fa670d1923f20c07f3566be193ebd984ee7ad9ed3645f87f6bbdf94a.js'));
-  }
-  if (key === 'b8fb286eecb732153f493a56a753b310572ce368e6f9b92e3a152254936438d6') {
-    pending.push(import('./chunks/chunk-73a2958692cf7dfa39607f5ed1481b74bfd8b4e7a9112345b701f8a1755f547c.js'));
+    pending.push(import('./chunks/chunk-5898e03ed942cf90f0844f2942c53469e5754d889844d28a7a1eb3ef4c3b8388.js'));
   }
   return Promise.all(pending);
 }

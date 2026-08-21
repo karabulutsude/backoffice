@@ -19,15 +19,17 @@ import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-import jakarta.annotation.security.PermitAll;
+import jakarta.annotation.security.RolesAllowed;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @PageTitle("Uygulama Konfigürasyonları | Jollify Game Analytics")
 @Route(value = "config", layout = MainLayout.class)
-@PermitAll
+@RolesAllowed({"ROLE_ADMIN", "ADMIN", "CONFIG", "KONFIGURASYON", "KONFİGÜRASYON"})
 public class ConfigView extends VerticalLayout {
 
     private final BackofficeService backofficeService;
@@ -49,17 +51,21 @@ public class ConfigView extends VerticalLayout {
         configFilterSelect.setWidth("250px");
         configFilterSelect.addValueChangeListener(e -> applyFilter());
 
-        Button addButton = new Button("Yeni Konfigürasyon Ekle", VaadinIcon.PLUS.create(), e -> openAddDialog());
-        addButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
         Button refreshButton = new Button("Yenile", VaadinIcon.REFRESH.create(), e -> {
             configFilterSelect.setValue("Tümü");
             loadData();
         });
 
-        HorizontalLayout toolbar = new HorizontalLayout(configFilterSelect, addButton, refreshButton);
+        HorizontalLayout toolbar = new HorizontalLayout(configFilterSelect, refreshButton);
         toolbar.setAlignItems(FlexComponent.Alignment.BASELINE);
         toolbar.setWidthFull();
+
+        // Yeni Konfigürasyon Ekleme Yetkisi Kontrolü
+        if (hasConfigAddPermission()) {
+            Button addButton = new Button("Yeni Konfigürasyon Ekle", VaadinIcon.PLUS.create(), e -> openAddDialog());
+            addButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+            toolbar.addComponentAtIndex(1, addButton);
+        }
 
         grid.removeAllColumns();
 
@@ -67,7 +73,7 @@ public class ConfigView extends VerticalLayout {
         grid.addColumn(AppConfig::getConfigKey).setHeader("Ayar Anahtarı (Key)").setSortable(true);
         grid.addColumn(AppConfig::getConfigValue).setHeader("Ayar Değeri (Value)").setSortable(true);
 
-        // Aktif / Pasif Durum Kolonu (Görsel Badge veya Checkbox ile)
+        // Aktif / Pasif Durum Kolonu
         grid.addComponentColumn(appConfig -> {
             boolean isActive = appConfig.getIsActive() != null ? appConfig.getIsActive() : true;
             Span badge = new Span(isActive ? "Aktif" : "Pasif");
@@ -75,21 +81,31 @@ public class ConfigView extends VerticalLayout {
             return badge;
         }).setHeader("Durum").setSortable(true);
 
+        boolean hasEditPermission = hasConfigEditPermission();
+        boolean hasDeletePermission = hasConfigDeletePermission();
+
         // İşlemler Kolonu
         grid.addComponentColumn(appConfig -> {
             Button detailButton = new Button(VaadinIcon.EYE.create(), e -> openDetailDialog(appConfig));
             detailButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
             detailButton.setTooltipText("Konfigürasyon Detayları");
 
-            Button editButton = new Button(VaadinIcon.EDIT.create(), e -> openEditDialog(appConfig));
-            editButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_TERTIARY);
-            editButton.setTooltipText("Düzenle");
+            HorizontalLayout actionsLayout = new HorizontalLayout(detailButton);
 
-            Button deleteButton = new Button(VaadinIcon.TRASH.create(), e -> deleteConfig(appConfig));
-            deleteButton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
-            deleteButton.setTooltipText("Sil");
+            if (hasEditPermission) {
+                Button editButton = new Button(VaadinIcon.EDIT.create(), e -> openEditDialog(appConfig));
+                editButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_TERTIARY);
+                editButton.setTooltipText("Düzenle");
+                actionsLayout.add(editButton);
+            }
 
-            HorizontalLayout actionsLayout = new HorizontalLayout(detailButton, editButton, deleteButton);
+            if (hasDeletePermission) {
+                Button deleteButton = new Button(VaadinIcon.TRASH.create(), e -> deleteConfig(appConfig));
+                deleteButton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
+                deleteButton.setTooltipText("Sil");
+                actionsLayout.add(deleteButton);
+            }
+
             actionsLayout.setSpacing(false);
             return actionsLayout;
         }).setHeader("İşlemler");
@@ -98,6 +114,41 @@ public class ConfigView extends VerticalLayout {
 
         add(toolbar, grid);
         loadData();
+    }
+
+    private boolean hasConfigAddPermission() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+        if (isAdmin(auth)) return true;
+        return auth.getAuthorities().stream().anyMatch(a -> {
+            String u = a.getAuthority().toUpperCase();
+            return u.equals("CONFIG_ADD") || u.equals("KONFIG_EKLE") || u.equals("KONFIGÜRASYON_EKLE") || u.equals("KONFİGÜRASYON_EKLE");
+        });
+    }
+
+    private boolean hasConfigEditPermission() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+        if (isAdmin(auth)) return true;
+        return auth.getAuthorities().stream().anyMatch(a -> {
+            String u = a.getAuthority().toUpperCase();
+            return u.equals("CONFIG_EDIT") || u.equals("KONFIG_DUZENLE") || u.equals("KONFIGÜRASYON_DÜZENLE") || u.equals("KONFİGÜRASYON_DÜZENLE");
+        });
+    }
+
+    private boolean hasConfigDeletePermission() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+        if (isAdmin(auth)) return true;
+        return auth.getAuthorities().stream().anyMatch(a -> {
+            String u = a.getAuthority().toUpperCase();
+            return u.equals("CONFIG_DELETE") || u.equals("KONFIG_SILME") || u.equals("KONFIGÜRASYON_SİLME") || u.equals("KONFİGÜRASYON_SİLME");
+        });
+    }
+
+    private boolean isAdmin(Authentication auth) {
+        return auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ADMIN") || a.getAuthority().equals("ROLE_SUPER_ADMIN"));
     }
 
     private void openDetailDialog(AppConfig appConfig) {

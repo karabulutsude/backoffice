@@ -18,8 +18,10 @@ import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-import jakarta.annotation.security.PermitAll;
+import jakarta.annotation.security.RolesAllowed;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,13 +30,12 @@ import java.util.List;
 
 @PageTitle("Oyuncular | Jollify Game Analytics")
 @Route(value = "players", layout = MainLayout.class)
-@PermitAll
+@RolesAllowed({"ROLE_ADMIN", "ADMIN", "PLAYERS", "OYUNCU", "OYUNCULAR"})
 public class PlayerView extends VerticalLayout {
 
     private final BackofficeService backofficeService;
     private final Grid<Player> grid = new Grid<>(Player.class);
 
-    // Select bileşeni içine yazı yazılmasına izin vermez, sadece tıklayıp seçtirir.
     private final Select<String> countryFilter = new Select<>();
     private final Select<String> timeFilter = new Select<>();
 
@@ -46,13 +47,11 @@ public class PlayerView extends VerticalLayout {
 
         add(new H2("Oyuncu Listesi"));
 
-        // Ülke Filtresi Ayarları
         countryFilter.setLabel("Ülke Filtresi");
         countryFilter.setItems("Tümü", "TR", "US", "DE", "ES", "FR");
         countryFilter.setValue("Tümü");
         countryFilter.addValueChangeListener(e -> applyFilters());
 
-        // Zaman Filtresi Ayarları
         timeFilter.setLabel("Zaman Aralığı");
         timeFilter.setItems("Tüm Zamanlar", "Bugün", "Son 7 Gün", "Bu Ay");
         timeFilter.setValue("Tüm Zamanlar");
@@ -89,21 +88,37 @@ public class PlayerView extends VerticalLayout {
             detailButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
             detailButton.setTooltipText("Oyuncu Detayları");
 
-            Button editButton = new Button(VaadinIcon.EDIT.create(), e -> openEditDialog(player));
-            editButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_TERTIARY);
-            editButton.setTooltipText("Ülke Düzenle");
-
-            Button banButton = new Button(player.isBanned() ? VaadinIcon.UNLOCK.create() : VaadinIcon.BAN.create(),
-                    e -> toggleBanPlayer(player));
-            banButton.addThemeVariants(player.isBanned() ? ButtonVariant.LUMO_SUCCESS : ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
-            banButton.setTooltipText(player.isBanned() ? "Engeli Kaldır" : "Oyuncuyu Engelle");
-
-            Button deleteButton = new Button(VaadinIcon.TRASH.create(), e -> deletePlayer(player));
-            deleteButton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
-            deleteButton.setTooltipText("Oyuncuyu Sil");
-
-            HorizontalLayout actionsLayout = new HorizontalLayout(detailButton, editButton, banButton, deleteButton);
+            HorizontalLayout actionsLayout = new HorizontalLayout(detailButton);
             actionsLayout.setSpacing(false);
+
+            // Yetki kontrolleri (Admin veya ilgili işlem yetkisi var mı?)
+            boolean isAdmin = hasAnyRole("ADMIN", "ROLE_ADMIN");
+            boolean canEdit = isAdmin || hasAnyRole("PLAYER_EDIT", "OYUNCU DÜZENLE", "OYUNCU_DUZENLE");
+            boolean canBan = isAdmin || hasAnyRole("PLAYER_BAN", "OYUNCU ENGELLEME", "OYUNCU_ENGELLE");
+            boolean canDelete = isAdmin || hasAnyRole("PLAYER_DELETE", "OYUNCU SİLME", "OYUNCU_SIL");
+
+            if (canEdit) {
+                Button editButton = new Button(VaadinIcon.EDIT.create(), e -> openEditDialog(player));
+                editButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_TERTIARY);
+                editButton.setTooltipText("Ülke Düzenle");
+                actionsLayout.add(editButton);
+            }
+
+            if (canBan) {
+                Button banButton = new Button(player.isBanned() ? VaadinIcon.UNLOCK.create() : VaadinIcon.BAN.create(),
+                        e -> toggleBanPlayer(player));
+                banButton.addThemeVariants(player.isBanned() ? ButtonVariant.LUMO_SUCCESS : ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
+                banButton.setTooltipText(player.isBanned() ? "Engeli Kaldır" : "Oyuncuyu Engelle");
+                actionsLayout.add(banButton);
+            }
+
+            if (canDelete) {
+                Button deleteButton = new Button(VaadinIcon.TRASH.create(), e -> deletePlayer(player));
+                deleteButton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
+                deleteButton.setTooltipText("Oyuncuyu Sil");
+                actionsLayout.add(deleteButton);
+            }
+
             return actionsLayout;
         }).setHeader("İşlemler");
 
@@ -111,6 +126,21 @@ public class PlayerView extends VerticalLayout {
 
         add(toolbar, grid);
         refreshGrid();
+    }
+
+    private boolean hasAnyRole(String... roles) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+        return auth.getAuthorities().stream()
+                .anyMatch(authority -> {
+                    String authName = authority.getAuthority().trim();
+                    for (String role : roles) {
+                        if (authName.equalsIgnoreCase(role) || authName.equalsIgnoreCase("ROLE_" + role)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                });
     }
 
     private void openDetailDialog(Player player) {
@@ -160,12 +190,12 @@ public class PlayerView extends VerticalLayout {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Oyuncu Ülke Bilgisini Düzenle");
 
-        TextField playerIdField = new TextField("Oyuncu ID (Değiştirilemez)");
+        TextField playerIdField = new TextField("Oyuncu ID");
         playerIdField.setValue(player.getPlayerId() != null ? player.getPlayerId() : "");
         playerIdField.setEnabled(false);
         playerIdField.setWidthFull();
 
-        TextField deviceIdField = new TextField("Cihaz ID (Değiştirilemez)");
+        TextField deviceIdField = new TextField("Cihaz ID");
         deviceIdField.setValue(player.getDeviceId() != null ? player.getDeviceId() : "");
         deviceIdField.setEnabled(false);
         deviceIdField.setWidthFull();
@@ -179,13 +209,13 @@ public class PlayerView extends VerticalLayout {
                 player.setCountry(countryField.getValue());
                 backofficeService.updatePlayer(player.getId(), player);
 
-                Notification notif = Notification.show("Oyuncu ülkesi başarıyla güncellendi!", 3000, Notification.Position.TOP_CENTER);
-                notif.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                Notification.show("Oyuncu ülkesi güncellendi!", 3000, Notification.Position.TOP_CENTER)
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
 
                 dialog.close();
                 applyFilters();
             } catch (Exception ex) {
-                Notification.show("Güncelleme hatası: " + ex.getMessage(), 3000, Notification.Position.TOP_CENTER);
+                Notification.show("Hata: " + ex.getMessage(), 3000, Notification.Position.TOP_CENTER);
             }
         });
         saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
@@ -203,18 +233,18 @@ public class PlayerView extends VerticalLayout {
 
     private void toggleBanPlayer(Player player) {
         boolean newBanStatus = !player.isBanned();
-        String actionMessage = newBanStatus ? "Oyuncu engellendi." : "Oyuncunun engeli kaldırıldı.";
+        String actionMessage = newBanStatus ? "Oyuncu engellendi." : "Engel kaldırıldı.";
 
         try {
             player.setBanned(newBanStatus);
             backofficeService.updatePlayer(player.getId(), player);
 
-            Notification notif = Notification.show(actionMessage, 3000, Notification.Position.TOP_CENTER);
-            notif.addThemeVariants(newBanStatus ? NotificationVariant.LUMO_ERROR : NotificationVariant.LUMO_SUCCESS);
+            Notification.show(actionMessage, 3000, Notification.Position.TOP_CENTER)
+                    .addThemeVariants(newBanStatus ? NotificationVariant.LUMO_ERROR : NotificationVariant.LUMO_SUCCESS);
 
             applyFilters();
         } catch (Exception ex) {
-            Notification.show("İşlem hatası: " + ex.getMessage());
+            Notification.show("Hata: " + ex.getMessage());
         }
     }
 
@@ -226,12 +256,12 @@ public class PlayerView extends VerticalLayout {
         Button confirmButton = new Button("Sil", e -> {
             try {
                 backofficeService.deletePlayer(player.getId());
-                Notification notif = Notification.show("Oyuncu silindi.", 3000, Notification.Position.TOP_CENTER);
-                notif.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                Notification.show("Oyuncu silindi.", 3000, Notification.Position.TOP_CENTER)
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
                 confirmDialog.close();
                 applyFilters();
             } catch (Exception ex) {
-                Notification.show("Silme hatası: " + ex.getMessage());
+                Notification.show("Hata: " + ex.getMessage());
             }
         });
         confirmButton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_PRIMARY);
@@ -251,11 +281,9 @@ public class PlayerView extends VerticalLayout {
             LocalDateTime now = LocalDateTime.now();
 
             List<Player> filteredPlayers = allPlayers.stream().filter(p -> {
-                // Ülke Filtresi Kontrolü
                 boolean matchesCountry = ("Tümü".equals(country) || country == null ||
                         (p.getCountry() != null && p.getCountry().equalsIgnoreCase(country)));
 
-                // Zaman Filtresi Kontrolü
                 boolean matchesTime = true;
                 if (p.getCreatedAt() != null && selectedTime != null) {
                     switch (selectedTime) {
@@ -270,7 +298,7 @@ public class PlayerView extends VerticalLayout {
                                     p.getCreatedAt().getMonth() == now.getMonth();
                             break;
                         default:
-                            matchesTime = true; // "Tüm Zamanlar"
+                            matchesTime = true;
                     }
                 }
 
@@ -279,7 +307,7 @@ public class PlayerView extends VerticalLayout {
 
             grid.setItems(filteredPlayers);
         } catch (Exception e) {
-            Notification.show("Filtreleme hatası: " + e.getMessage());
+            Notification.show("Hata: " + e.getMessage());
         }
     }
 

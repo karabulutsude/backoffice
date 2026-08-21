@@ -39,27 +39,34 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             authorities.add(new SimpleGrantedAuthority("USERS"));
 
         } else if (user.getPermissions() != null) {
-            // Veritabanından gelen yetkileri virgülle ayırıp işliyoruz
+            // Veritabanındaki yetkileri alıp büyük harfe çeviriyoruz
             for (String perm : user.getPermissions().split(",")) {
-                String cleanPerm = perm.trim().toUpperCase();
+                String cleanPerm = perm.trim().toUpperCase(java.util.Locale.ROOT);
                 if (!cleanPerm.isEmpty()) {
                     authorities.add(new SimpleGrantedAuthority(cleanPerm));
+                    authorities.add(new SimpleGrantedAuthority("ROLE_" + cleanPerm));
 
-                    // Türkçe/Farklı yazımları standart İngilizce yetkilere eşle (Mapping)
-                    if (cleanPerm.contains("ANALİTİK") || cleanPerm.contains("ANALYTICS")) {
+                    if (cleanPerm.contains("ANALİTİK") || cleanPerm.contains("ANALITIK") || cleanPerm.contains("ANALYTICS")) {
                         authorities.add(new SimpleGrantedAuthority("ANALYTICS"));
+                        authorities.add(new SimpleGrantedAuthority("ROLE_ANALYTICS"));
                     }
-                    if (cleanPerm.contains("KONFİGÜRASYON") || cleanPerm.contains("CONFIG")) {
+                    if (cleanPerm.contains("KONFİGÜRASYON") || cleanPerm.contains("KONFIGURASYON") || cleanPerm.contains("CONFIG")) {
                         authorities.add(new SimpleGrantedAuthority("CONFIG"));
+                        authorities.add(new SimpleGrantedAuthority("ROLE_CONFIG"));
                     }
                     if (cleanPerm.contains("OYUNCU") || cleanPerm.contains("PLAYERS")) {
                         authorities.add(new SimpleGrantedAuthority("PLAYERS"));
+                        authorities.add(new SimpleGrantedAuthority("ROLE_PLAYERS"));
                     }
-                    if (cleanPerm.contains("İLERLEME") || cleanPerm.contains("PROGRESS")) {
+                    if (cleanPerm.contains("İLERLEME") || cleanPerm.contains("ILERLEME") || cleanPerm.contains("PROGRESS")) {
                         authorities.add(new SimpleGrantedAuthority("PROGRESS"));
+                        authorities.add(new SimpleGrantedAuthority("ROLE_PROGRESS"));
                     }
-                    if (cleanPerm.contains("KULLANICI") || cleanPerm.contains("USERS")) {
+                    if (cleanPerm.contains("KULLANICI") || cleanPerm.contains("KULLANIC") || cleanPerm.contains("USERS")) {
                         authorities.add(new SimpleGrantedAuthority("USERS"));
+                        authorities.add(new SimpleGrantedAuthority("KULLANICILAR"));
+                        authorities.add(new SimpleGrantedAuthority("ROLE_USERS"));
+                        authorities.add(new SimpleGrantedAuthority("ROLE_KULLANICILAR"));
                     }
                 }
             }

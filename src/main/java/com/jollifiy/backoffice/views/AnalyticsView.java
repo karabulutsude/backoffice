@@ -15,11 +15,12 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
-import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-import jakarta.annotation.security.PermitAll;
+import jakarta.annotation.security.RolesAllowed;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -29,7 +30,7 @@ import java.util.Locale;
 
 @PageTitle("Oyun Analitikleri | Jollify Game Analytics")
 @Route(value = "analytics", layout = MainLayout.class)
-@PermitAll
+@RolesAllowed({"ROLE_ADMIN", "ADMIN", "ANALYTICS", "ANALITIK", "ANALİTİK"})
 public class AnalyticsView extends VerticalLayout {
 
     private final BackofficeService backofficeService;
@@ -92,16 +93,24 @@ public class AnalyticsView extends VerticalLayout {
                 .setHeader("Zaman")
                 .setSortable(true);
 
+        // Kullanıcının silme yetkisini kontrol ediyoruz
+        boolean hasDeletePermission = hasAnalyticsDeletePermission();
+
         grid.addComponentColumn(analytics -> {
             Button detailButton = new Button(VaadinIcon.EYE.create(), e -> openDetailsDialog(analytics));
             detailButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
             detailButton.setTooltipText("Detayları Görüntüle");
 
-            Button deleteButton = new Button(VaadinIcon.TRASH.create(), e -> deleteAnalytics(analytics));
-            deleteButton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
-            deleteButton.setTooltipText("Kayıt Sil");
+            HorizontalLayout actionsLayout = new HorizontalLayout(detailButton);
 
-            HorizontalLayout actionsLayout = new HorizontalLayout(detailButton, deleteButton);
+            // Eğer kullanıcının analitik silme yetkisi varsa silme butonunu ekliyoruz
+            if (hasDeletePermission) {
+                Button deleteButton = new Button(VaadinIcon.TRASH.create(), e -> deleteAnalytics(analytics));
+                deleteButton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
+                deleteButton.setTooltipText("Kayıt Sil");
+                actionsLayout.add(deleteButton);
+            }
+
             actionsLayout.setSpacing(false);
             return actionsLayout;
         }).setHeader("İşlemler");
@@ -110,6 +119,26 @@ public class AnalyticsView extends VerticalLayout {
 
         add(toolbar, grid);
         applyFilters();
+    }
+
+    /**
+     * Oturum açan kullanıcının analitik silme yetkisine sahip olup olmadığını kontrol eder.
+     */
+    private boolean hasAnalyticsDeletePermission() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+
+        // Admin veya tam yetkili roller doğrudan silebilir
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ADMIN") || a.getAuthority().equals("ROLE_SUPER_ADMIN"));
+        if (isAdmin) return true;
+
+        // Özel yetkiler arasında ANALYTICS_DELETE veya ANALITIK_SILME var mı kontrol ediyoruz
+        return auth.getAuthorities().stream()
+                .anyMatch(a -> {
+                    String authority = a.getAuthority().toUpperCase();
+                    return authority.equals("ANALYTICS_DELETE") || authority.equals("ANALITIK_SILME") || authority.equals("ANALİTİK_SİLME");
+                });
     }
 
     private void openDetailsDialog(Analytics analytics) {

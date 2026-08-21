@@ -32,19 +32,35 @@ public class SecurityConfig extends VaadinWebSecurity {
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
-        // Özel statik dosyalar ve dış kaynaklar için serbestlik tanıma
-        http.authorizeHttpRequests(auth ->
-                auth.requestMatchers(new AntPathRequestMatcher("/images/*.png")).permitAll()
+        http.authorizeHttpRequests(auth -> auth
+                // ERİŞİM ENGELLENDİ SAYFASINI HERKESE AÇIYORUZ:
+                .requestMatchers(new AntPathRequestMatcher("/access-denied")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/images/*.png")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/config/**")).hasAnyRole("CONFIG", "ADMIN", "KONFIGURASYON")
+                .requestMatchers(new AntPathRequestMatcher("/analytics/**")).hasAnyRole("ANALYTICS", "ADMIN", "ANALITIK", "ANALİTİK")
+                .requestMatchers(new AntPathRequestMatcher("/users/**")).hasAnyRole("USERS", "ADMIN", "KULLANICILAR")
         );
 
         super.configure(http);
 
-        // Vaadin standart login ekranını ve özel hata yönlendiricimizi bağlıyoruz
+        // Kilit ekranına yönlendirme
+        http.exceptionHandling(exceptions -> exceptions
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    response.sendRedirect("/access-denied");
+                })
+        );
+
+        // Vaadin standart login ekranı
         setLoginView(http, LoginView.class);
 
-        // Form login yapılandırmasına hata yönlendiricisini entegre ediyoruz
         http.formLogin(form -> form
                 .failureHandler(authenticationFailureHandler())
+        );
+
+        http.logout(logout -> logout
+                .logoutRequestMatcher(new AntPathRequestMatcher("/logout", "GET"))
+                .logoutSuccessUrl("/login?logout")
+                .permitAll()
         );
     }
 

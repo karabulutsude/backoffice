@@ -1,9 +1,12 @@
 package com.jollifiy.backoffice.views;
 
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.avatar.Avatar;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
@@ -72,7 +75,7 @@ public class MainLayout extends AppLayout {
         avatar.setThemeName("xsmall");
 
         Span userName = new Span(currentUsername);
-        userName.addClassName(LumoUtility.FontSize.SMALL);
+        userName.addClassNames(LumoUtility.FontSize.SMALL);
 
         String roleText = "Yetkili Kullanıcı";
         if (hasAuthority(authentication, "ROLE_ADMIN")) {
@@ -85,8 +88,16 @@ public class MainLayout extends AppLayout {
         userInfoText.setPadding(false);
         userInfoText.setSpacing(false);
 
-        HorizontalLayout userFooter = new HorizontalLayout(avatar, userInfoText);
+        // Çıkış Yap butonu: window.top.location.href kullanarak router engeline takılmadan direkt /logout tetikler
+        Button logoutButton = new Button(VaadinIcon.SIGN_OUT.create(), e -> {
+            UI.getCurrent().getPage().executeJs("window.top.location.href = '/logout';");
+        });
+        logoutButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ERROR);
+        logoutButton.setTooltipText("Güvenli Çıkış Yap");
+
+        HorizontalLayout userFooter = new HorizontalLayout(avatar, userInfoText, logoutButton);
         userFooter.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
+        userFooter.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
         userFooter.addClassNames(LumoUtility.Padding.MEDIUM, LumoUtility.Border.TOP, LumoUtility.BorderColor.CONTRAST_10);
         userFooter.setWidthFull();
 
@@ -112,16 +123,28 @@ public class MainLayout extends AppLayout {
 
         return authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
-                .map(auth -> auth.replace("ROLE_", "").toUpperCase())
+                .map(auth -> auth.replace("ROLE_", "").toUpperCase().trim())
                 .anyMatch(cleanAuth -> {
                     String target = moduleKey.toUpperCase();
 
-                    if (target.equals("CONFIG") && (cleanAuth.contains("CONFIG") || cleanAuth.contains("KONFIGURASYON") || cleanAuth.contains("KONFİGÜRASYON"))) return true;
-                    if (target.equals("ANALYTICS") && (cleanAuth.contains("ANALYTICS") || cleanAuth.contains("ANALITIK") || cleanAuth.contains("ANALİTİK"))) return true;
-                    if (target.equals("PLAYERS") && (cleanAuth.contains("PLAYERS") || cleanAuth.contains("OYUNCU"))) return true;
-                    if (target.equals("PROGRESS") && (cleanAuth.contains("PROGRESS") || cleanAuth.contains("ILERLEME") || cleanAuth.contains("İLERLEME"))) return true;
-                    if (target.equals("USERS") && (cleanAuth.contains("USERS") || cleanAuth.contains("KULLANICI"))) return true;
-                    if (target.equals("DASHBOARD")) return true;
+                    if (target.equals("CONFIG")) {
+                        return cleanAuth.contains("CONFIG") || cleanAuth.contains("KONFIGURASYON") || cleanAuth.contains("KONFİGÜRASYON");
+                    }
+                    if (target.equals("ANALYTICS")) {
+                        return cleanAuth.contains("ANALYTICS") || cleanAuth.contains("ANALITIK") || cleanAuth.contains("ANALİTİK");
+                    }
+                    if (target.equals("PLAYERS")) {
+                        return cleanAuth.contains("PLAYERS") || cleanAuth.contains("OYUNCU");
+                    }
+                    if (target.equals("PROGRESS")) {
+                        return cleanAuth.contains("PROGRESS") || cleanAuth.contains("ILERLEME") || cleanAuth.contains("İLERLEME");
+                    }
+                    if (target.equals("USERS")) {
+                        return cleanAuth.contains("USERS") || cleanAuth.contains("KULLANICI");
+                    }
+                    if (target.equals("DASHBOARD")) {
+                        return true;
+                    }
 
                     return cleanAuth.equals(target) || cleanAuth.contains(target);
                 });
